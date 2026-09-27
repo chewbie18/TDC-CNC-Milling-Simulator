@@ -1,0 +1,114 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TDC CNC Milling Simulator</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font:14px Segoe UI,Arial,sans-serif;background:linear-gradient(135deg,#dff7ec,#f7fffc);color:#17352d}header{height:60px;padding:10px 18px;background:#123d35;color:#fff;display:flex;align-items:center;justify-content:space-between}h1{font-size:20px;margin:0}.app{display:grid;grid-template-columns:460px 1fr;height:calc(100vh - 60px)}aside{padding:13px;background:#f8fffc;border-right:1px solid #b9d9cf;overflow:auto}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.field{margin:6px 0}label{display:block;font-size:12px;font-weight:700;margin-bottom:3px}input,textarea,button,select{width:100%;border:1px solid #9bbdb3;border-radius:7px;padding:8px;font:inherit}textarea{height:390px;min-height:300px;resize:vertical;font:12px Consolas,monospace;line-height:1.35;white-space:pre;overflow:auto}textarea.active-line{outline:2px solid #d6a318;box-shadow:0 0 0 3px #ffeaa255}textarea::selection{background:#ffe34d;color:#111}textarea::-moz-selection{background:#ffe34d;color:#111}button{cursor:pointer;background:#176c59;color:#fff;font-weight:700;border:0}.secondary{background:#607a73}.danger{background:#a4473d}.controls{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0}.controls button{padding:9px 3px}.note{font-size:11px;color:#527069;margin:7px 0}.status{margin-top:8px;padding:9px;border-radius:7px;background:#e6f4ef;font-size:12px;white-space:pre-wrap}.timebox{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:7px 0}.metric{background:#e9f6f1;border:1px solid #c7e2d9;border-radius:7px;padding:6px}.metric b{display:block;font-size:11px;color:#57726b}.metric span{font:700 14px Consolas,monospace}.progress{height:10px;background:#d2e5df;border-radius:20px;overflow:hidden;margin:7px 0}.bar{height:100%;width:0;background:#176c59}.linebox{font:12px Consolas,monospace;background:#17352d;color:#eafff8;padding:8px;border-radius:7px;min-height:33px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}main{position:relative;min-width:0;overflow:hidden}.toolbar{position:absolute;z-index:2;top:10px;left:10px;background:#ffffffea;padding:8px 11px;border-radius:8px;box-shadow:0 2px 12px #0002;font:12px Consolas,monospace}.legend{position:absolute;z-index:2;right:10px;bottom:10px;background:#ffffffd9;padding:7px 9px;border-radius:7px;font-size:11px}canvas{display:block;width:100%;height:100%;cursor:grab}@media(max-width:850px){.app{grid-template-columns:1fr;grid-template-rows:auto 60vh}aside{max-height:48vh;border-right:0;border-bottom:1px solid #b9d9cf}}
+</style>
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#123d35">
+<meta name="application-name" content="TDC CNC Milling Simulator">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="./icon-192.png">
+
+</head><body>
+<header><div><h1>TDC CNC Milling Simulator</h1><div style="font-size:11px;opacity:.85;margin-top:2px">Created by: Engr. Triztan S. de la Cruz</div></div><span>3-Axis Milling • Z0 = Stock Top • Offline</span></header>
+<div class="app"><aside>
+<div class="row"><div class="field"><label>Workpiece X (mm)</label><input id="sx" type="number" value="200"></div><div class="field"><label>Workpiece Y (mm)</label><input id="sy" type="number" value="200"></div></div>
+<div class="row"><div class="field"><label>Thickness Z (mm)</label><input id="sz" type="number" value="10"></div><div class="field"><label>Tool Ø (mm)</label><input id="tool" type="number" value="10" min="0.1" step="0.1"></div></div>
+<div class="row"><div class="field"><label>Rapid speed (mm/min)</label><input id="rapid" type="number" value="3000"></div><div class="field"><label>Playback speed</label><select id="speed"><option>.25</option><option>.5</option><option selected>1</option><option>2</option><option>5</option><option>10</option><option>25</option><option>50</option></select></div></div>
+<div class="field"><label>XY Program Origin</label><select id="origin"><option value="lowerleft" selected>Lower Left (X0 Y0 at stock corner)</option><option value="center">Center (X0 Y0 at stock center)</option></select></div>
+<div class="field"><label>G-code</label><textarea id="code" placeholder="Paste or type your CNC milling G-code here..."></textarea></div>
+<div class="controls"><button id="play">▶ PLAY</button><button id="pause" class="secondary">Ⅱ PAUSE</button><button id="stop" class="danger">■ STOP</button><button id="restart" class="secondary">↺ RESET</button></div>
+<div class="row"><button id="speedup" style="background:#9a6a00">⚡ SPEED UP</button><button id="toolpathToggle" style="background:#355f73">TOOLPATH: ON</button></div><div class="metric" style="text-align:center;padding:8px;margin:6px 0"><b>PLAYBACK SPEED</b><span id="speedread">1×</span></div>
+<div class="progress"><div id="bar" class="bar"></div></div>
+<div class="timebox"><div class="metric"><b>CNC ELAPSED</b><span id="elapsed">00:00</span></div><div class="metric"><b>EST. TOTAL</b><span id="total">00:00</span></div><div class="metric"><b>PROGRESS</b><span id="pct">0.0%</span></div><div class="metric"><b>FEED</b><span id="feed">0 mm/min</span></div></div>
+<div id="linebox" class="linebox">Ready.</div>
+<div class="note">Origin: Lower Left or Center. Supported: G00/G01, G20/G21, G90/G91, F feed. Flat end mill. Pause preserves the cut. Stop halts motion. Reset restores fresh stock. SPEED UP changes playback live without resetting. TOOLPATH ON/OFF hides or shows path lines only. Active G-code motion line is highlighted in yellow and auto-scrolls during simulation. Tool diameter drives the physical cut width (including 1 mm and fractional tools). Adaptive stock resolution is used for small cutters. Mouse: drag rotate • wheel zoom.</div>
+<div id="status" class="status">Ready. Press PLAY to begin.</div>
+</aside><main><div class="toolbar" id="hud">X 0.000 &nbsp; Y 0.000 &nbsp; Z 5.000</div><div class="legend">CNC coordinates • selectable XY origin • X→right • Y→back • Z→up<br><button id="iso" style="margin-top:5px;padding:4px 7px;width:auto">ISO</button> <button id="top" style="padding:4px 7px;width:auto">TOP</button></div><canvas id="cv"></canvas></main></div>
+<script>
+(()=>{'use strict';const $=id=>document.getElementById(id),cv=$('cv'),ctx=cv.getContext('2d'),status=$('status'),hud=$('hud');let W=200,H=200,T=10,D=10,res=1,nx=0,ny=0,grid,segments=[],completed=[],yaw=-.72,pitch=.68,zoom=1,drag=false,lx=0,ly=0,state='idle',segI=0,segP=0,toolPos={x:0,y:0,z:5},lastTs=0,cncElapsed=0,totalTime=0,currentFeed=0,toolpathVisible=true;
+function resize(){let r=cv.getBoundingClientRect(),d=devicePixelRatio||1;cv.width=Math.max(1,r.width*d);cv.height=Math.max(1,r.height*d);ctx.setTransform(d,0,0,d,0,0);draw()}addEventListener('resize',resize);
+function initStock(){W=Math.max(1,+sx.value||200);H=Math.max(1,+sy.value||200);T=Math.max(.1,+sz.value||10);D=Math.max(.1,+tool.value||10);res=Math.min(Math.max(W,H)/220, D/5);
+res=Math.max(0.05,res);
+let maxCells=1600000, estimated=(Math.ceil(W/res)+1)*(Math.ceil(H/res)+1);
+if(estimated>maxCells){res=Math.sqrt((W*H)/maxCells);}
+nx=Math.ceil(W/res)+1;ny=Math.ceil(H/res)+1;grid=new Float32Array(nx*ny);completed=[];segI=0;segP=0;cncElapsed=0;toolPos={x:0,y:0,z:5};currentFeed=0;updateUI()}
+function parse(){let x=0,y=0,z=5,metric=true,abs=true,motion=0,feed=300,segs=[],warn=[],lines=code.value.split(/\r?\n/);for(let n=0;n<lines.length;n++){let display=lines[n].trim(),raw=display.replace(/\([^)]*\)/g,'').replace(/;.*/,'').trim().toUpperCase();if(!raw)continue;let tok=[...raw.matchAll(/([A-Z])\s*(-?\d*\.?\d+)/g)].map(m=>[m[1],+m[2]]),vals={};for(const [a,v] of tok){if(a==='G'){let g=Math.round(v);if(g===20)metric=false;else if(g===21)metric=true;else if(g===90)abs=true;else if(g===91)abs=false;else if(g===0||g===1)motion=g;else if(g===2||g===3)warn.push('Line '+(n+1)+': G02/G03 not yet supported.')}else vals[a]=v}let k=metric?1:25.4;if(vals.F!=null)feed=Math.max(.1,vals.F*k);let x1=x,y1=y,z1=z;if(vals.X!=null)x1=abs?vals.X*k:x+vals.X*k;if(vals.Y!=null)y1=abs?vals.Y*k:y+vals.Y*k;if(vals.Z!=null)z1=abs?vals.Z*k:z+vals.Z*k;if(x1!==x||y1!==y||z1!==z){let len=Math.hypot(x1-x,y1-y,z1-z),f=motion===0?Math.max(1,+rapid.value||3000):feed,dur=len/f*60;segs.push({x0:x,y0:y,z0:z,x1,y1,z1,cut:motion===1,feed:f,dur,line:n+1,text:display||raw});x=x1;y=y1;z=z1}}return{segs,warn}}
+function originMode(){return $('origin').value;}
+function toStock(x,y){return originMode()==='center'?[x+W/2,y+H/2]:[x,y]}
+function carvePoint(x,y,z){if(z>=0)return;[x,y]=toStock(x,y);let cut=Math.min(T,-z),r=D/2,ix0=Math.max(0,Math.floor((x-r)/res)),ix1=Math.min(nx-1,Math.ceil((x+r)/res)),iy0=Math.max(0,Math.floor((y-r)/res)),iy1=Math.min(ny-1,Math.ceil((y+r)/res));for(let j=iy0;j<=iy1;j++)for(let i=ix0;i<=ix1;i++){let px=i*res,py=j*res;if((px-x)**2+(py-y)**2<=r*r){let idx=j*nx+i;if(cut>grid[idx])grid[idx]=cut}}}
+function carveBetween(a,b){let len=Math.hypot(b.x-a.x,b.y-a.y,b.z-a.z),steps=Math.max(1,Math.ceil(len/Math.max(0.02,Math.min(res*.45,D/8))));for(let q=1;q<=steps;q++){let t=q/steps;carvePoint(a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t,a.z+(b.z-a.z)*t)}}
+function prepare(){initStock();let r=parse();segments=r.segs;totalTime=segments.reduce((a,s)=>a+s.dur,0);status.textContent=`Loaded ${segments.length} motion segments.\nEstimated CNC time: ${fmt(totalTime)}${r.warn.length?'\nWarnings:\n'+r.warn.slice(0,6).join('\n'):''}`;updateUI();draw()}
+function playSim(){if(state==='finished'||state==='stopped'||!segments.length)prepare();if(!segments.length)return;if(state!=='running'){state='running';lastTs=performance.now();requestAnimationFrame(tick);status.textContent='Simulation running…'}}
+function tick(ts){if(state!=='running')return;let realDt=Math.min(.08,(ts-lastTs)/1000||0);lastTs=ts;let budget=realDt*Math.max(.01,+speed.value||1);while(budget>0&&segI<segments.length){let s=segments[segI],remain=s.dur*(1-segP),use=Math.min(budget,remain),oldP=segP;segP+=s.dur?use/s.dur:1;segP=Math.min(1,segP);let old={x:s.x0+(s.x1-s.x0)*oldP,y:s.y0+(s.y1-s.y0)*oldP,z:s.z0+(s.z1-s.z0)*oldP},now={x:s.x0+(s.x1-s.x0)*segP,y:s.y0+(s.y1-s.y0)*segP,z:s.z0+(s.z1-s.z0)*segP};if(s.cut)carveBetween(old,now);toolPos=now;currentFeed=s.feed;cncElapsed+=use;budget-=use;if(segP>=.999999){completed.push(s);segI++;segP=0}}
+if(segI>=segments.length){state='finished';cncElapsed=totalTime;status.textContent='Simulation complete.'}updateUI();draw();if(state==='running')requestAnimationFrame(tick)}
+function pauseSim(){if(state==='running'){state='paused';status.textContent='Paused. Press PLAY to resume.'}}
+function stopSim(){if(state==='running'||state==='paused'){state='stopped';status.textContent='Stopped at current position. RESET for fresh stock, or PLAY to restart from beginning.'}}
+function clearEditorHighlight(){let ed=$('code');ed.classList.remove('active-line');try{ed.setSelectionRange(0,0)}catch(e){}}
+function highlightGcodeLine(lineNo){let ed=$('code');if(!lineNo||lineNo<1)return;let text=ed.value,lines=text.split(/\r?\n/),start=0;for(let i=0;i<lineNo-1&&i<lines.length;i++)start+=lines[i].length+1;let end=Math.min(text.length,start+(lines[lineNo-1]||'').length);ed.classList.add('active-line');try{ed.setSelectionRange(start,end)}catch(e){}let cs=getComputedStyle(ed),lh=parseFloat(cs.lineHeight)||16.2,target=(lineNo-1)*lh-ed.clientHeight/2+lh/2;ed.scrollTop=Math.max(0,target)}
+function resetSim(){state='idle';segments=[];totalTime=0;initStock();clearEditorHighlight();status.textContent='Reset complete. Fresh workpiece ready.';$('linebox').textContent='Ready.';draw()}
+function fmt(sec){sec=Math.max(0,sec||0);let h=Math.floor(sec/3600),m=Math.floor(sec%3600/60),s=Math.floor(sec%60);return h?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`}
+function updateUI(){let p=totalTime?Math.min(1,cncElapsed/totalTime):0;$('elapsed').textContent=fmt(cncElapsed);$('total').textContent=fmt(totalTime);$('pct').textContent=(p*100).toFixed(1)+'%';$('bar').style.width=(p*100)+'%';$('feed').textContent=Math.round(currentFeed)+' mm/min';hud.textContent=`X ${toolPos.x.toFixed(3)}   Y ${toolPos.y.toFixed(3)}   Z ${toolPos.z.toFixed(3)}`;if(segments.length&&segI<segments.length){$('linebox').textContent=`Line ${segments[segI].line}: ${segments[segI].text}`;highlightGcodeLine(segments[segI].line)}else if(state==='finished'){$('linebox').textContent='MACHINING COMPLETE';clearEditorHighlight()}}
+function project(x,y,z){x-=W/2;y-=H/2;let cy=Math.cos(yaw),sy=Math.sin(yaw),xx=x*cy-y*sy,yy=x*sy+y*cy,cp=Math.cos(pitch),sp=Math.sin(pitch),screenY=-(yy*cp+z*sp),depth=yy*sp-z*cp,scale=Math.min(cv.clientWidth/(W+H),cv.clientHeight/(Math.max(W,H)*.78+T))*1.55*zoom;return[cv.clientWidth/2+xx*scale,cv.clientHeight/2+screenY*scale,depth]}
+function poly(points,fill,stroke){ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.strokeStyle=stroke;ctx.stroke()}}
+function projectProgram(x,y,z){let q=toStock(x,y);return project(q[0],q[1],z)}
+function drawLine(s,portion=1){let x=s.x0+(s.x1-s.x0)*portion,y=s.y0+(s.y1-s.y0)*portion,z=s.z0+(s.z1-s.z0)*portion,a=projectProgram(s.x0,s.y0,-Math.max(0,-s.z0)),b=projectProgram(x,y,-Math.max(0,-z));ctx.strokeStyle=s.cut&&Math.min(s.z0,z)<0?'#777777':'#d08020';ctx.setLineDash(s.cut?[]:[5,4]);ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();ctx.setLineDash([])}
+function labelAxis(a,b,text,color){ctx.strokeStyle=color;ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();ctx.fillStyle=color;ctx.font='bold 12px Segoe UI';ctx.fillText(text,b[0]+5,b[1]-4)}
+function drawOriginMarker(){let q=toStock(0,0),o=project(q[0],q[1],0.6),r=11;ctx.save();ctx.strokeStyle='#e11d48';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(o[0]-r,o[1]);ctx.lineTo(o[0]+r,o[1]);ctx.moveTo(o[0],o[1]-r);ctx.lineTo(o[0],o[1]+r);ctx.stroke();ctx.restore();}
+function drawCoordRange(){}
+function draw(){if(!cv.width)return;ctx.clearRect(0,0,cv.clientWidth,cv.clientHeight);let bg=ctx.createLinearGradient(0,0,0,cv.clientHeight);bg.addColorStop(0,'#edf8f4');bg.addColorStop(1,'#cde8df');ctx.fillStyle=bg;ctx.fillRect(0,0,cv.clientWidth,cv.clientHeight);
+// Solid stock: Z=0 is TOP; negative Z goes into material.
+let top=[project(0,0,0),project(W,0,0),project(W,H,0),project(0,H,0)],bot=[project(0,0,-T),project(W,0,-T),project(W,H,-T),project(0,H,-T)];
+let faces=[{p:[top[0],top[1],bot[1],bot[0]],c:'#b8860b'},{p:[top[1],top[2],bot[2],bot[1]],c:'#9f7208'},{p:[top[2],top[3],bot[3],bot[2]],c:'#c89612'},{p:[top[3],top[0],bot[0],bot[3]],c:'#a97808'}];
+faces.sort((a,b)=>a.p.reduce((q,v)=>q+v[2],0)-b.p.reduce((q,v)=>q+v[2],0));for(const f of faces)poly(f.p,f.c,'#6f5107');poly(top,'#e0ad24','#745509');
+// SOLID 3D MACHINED STOCK: gray pocket floors plus vertical pocket walls.
+// The height map stores removed depth. A depth discontinuity becomes a visible vertical wall.
+let renderPitch=Math.max(res,Math.min(2,Math.max(0.10,D/4)));let step=Math.max(1,Math.round(renderPitch/res)),gx=[],gy=[];
+for(let i=0;i<nx-1;i+=step)gx.push(i); if(gx[gx.length-1]!==nx-1)gx.push(nx-1);
+for(let j=0;j<ny-1;j+=step)gy.push(j); if(gy[gy.length-1]!==ny-1)gy.push(ny-1);
+function sampledDepth(i,j){i=Math.max(0,Math.min(nx-1,i));j=Math.max(0,Math.min(ny-1,j));return Math.min(T,grid[j*nx+i]||0)}
+let solids=[];
+// Pocket floors. Use maximum local removal so narrow tool passes remain visibly recessed.
+for(let yk=0;yk<gy.length-1;yk++)for(let xk=0;xk<gx.length-1;xk++){
+  let i=gx[xk],ii=gx[xk+1],j=gy[yk],jj=gy[yk+1];
+  let d=Math.max(sampledDepth(i,j),sampledDepth(ii,j),sampledDepth(i,jj),sampledDepth(ii,jj));
+  if(d>.02){let x=i*res,y=j*res,x2=Math.min(W,ii*res),y2=Math.min(H,jj*res),z=-d;
+    let pts=[project(x,y,z),project(x2,y,z),project(x2,y2,z),project(x,y2,z)];
+    solids.push({depth:pts.reduce((q,v)=>q+v[2],0)/4,p:pts,c:'#9b9b9b',stroke:'#737373'});
+  }
+}
+// Vertical X-facing cut walls wherever neighboring sampled depths differ.
+for(let yk=0;yk<gy.length-1;yk++)for(let xk=1;xk<gx.length-1;xk++){
+  let i=gx[xk],j=gy[yk],jj=gy[yk+1],x=Math.min(W,i*res),y=j*res,y2=Math.min(H,jj*res);
+  let dl=Math.max(sampledDepth(gx[xk-1],j),sampledDepth(gx[xk-1],jj));
+  let dr=Math.max(sampledDepth(i,j),sampledDepth(i,jj));
+  if(Math.abs(dl-dr)>.04){let shallow=Math.min(dl,dr),deep=Math.max(dl,dr),pts=[project(x,y,-shallow),project(x,y2,-shallow),project(x,y2,-deep),project(x,y,-deep)];solids.push({depth:pts.reduce((q,v)=>q+v[2],0)/4,p:pts,c:'#6f6f6f',stroke:'#565656'});}
+}
+// Vertical Y-facing cut walls.
+for(let yk=1;yk<gy.length-1;yk++)for(let xk=0;xk<gx.length-1;xk++){
+  let j=gy[yk],i=gx[xk],ii=gx[xk+1],y=Math.min(H,j*res),x=i*res,x2=Math.min(W,ii*res);
+  let db=Math.max(sampledDepth(i,gy[yk-1]),sampledDepth(ii,gy[yk-1]));
+  let dt=Math.max(sampledDepth(i,j),sampledDepth(ii,j));
+  if(Math.abs(db-dt)>.04){let shallow=Math.min(db,dt),deep=Math.max(db,dt),pts=[project(x,y,-shallow),project(x2,y,-shallow),project(x2,y,-deep),project(x,y,-deep)];solids.push({depth:pts.reduce((q,v)=>q+v[2],0)/4,p:pts,c:'#777777',stroke:'#585858'});}
+}
+// Draw from back to front. Floors are gray; darker vertical faces make cut depth readable.
+solids.sort((a,b)=>a.depth-b.depth);for(const f of solids)poly(f.p,f.c,f.stroke);
+// Tool paths and live cutter.
+if(toolpathVisible){for(const s of completed)drawLine(s);if(segI<segments.length&&segP>0)drawLine(segments[segI],segP)}let p=projectProgram(toolPos.x,toolPos.y,toolPos.z),p2=projectProgram(toolPos.x,toolPos.y,toolPos.z+Math.max(18,T*1.5));ctx.strokeStyle='#263b36';ctx.lineWidth=Math.max(5,D*.18*zoom);ctx.beginPath();ctx.moveTo(p[0],p[1]);ctx.lineTo(p2[0],p2[1]);ctx.stroke();ctx.fillStyle='#d7dedb';ctx.beginPath();let edge=projectProgram(toolPos.x+D/2,toolPos.y,toolPos.z);
+let cutterRadiusPx=Math.max(1,Math.hypot(edge[0]-p[0],edge[1]-p[1]));
+ctx.arc(p[0],p[1],cutterRadiusPx,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#263b36';ctx.lineWidth=1;ctx.stroke();
+// Live program-origin indicator: crosshair only.
+drawOriginMarker()}
+$('toolpathToggle').onclick=()=>{toolpathVisible=!toolpathVisible;$('toolpathToggle').textContent='TOOLPATH: '+(toolpathVisible?'ON':'OFF');$('toolpathToggle').style.background=toolpathVisible?'#355f73':'#687b84';draw();};
+const speedSteps=[.25,.5,1,2,5,10,25,50];function syncSpeedRead(){let v=+speed.value||1;$('speedread').textContent=v+'×'}$('speed').addEventListener('change',syncSpeedRead);$('speedup').onclick=()=>{let v=+speed.value||1,i=speedSteps.findIndex(n=>n>=v-.0001);i=(i+1)%speedSteps.length;speed.value=String(speedSteps[i]);syncSpeedRead();status.textContent='Playback speed: '+speedSteps[i]+'×';};syncSpeedRead();
+$('origin').addEventListener('change',()=>{state='idle';segments=[];totalTime=0;initStock();$('linebox').textContent='Ready.';clearEditorHighlight();status.textContent=originMode()==='center'?'Origin: CENTER of workpiece.':'Origin: LOWER LEFT of workpiece.';draw();});$('iso').onclick=()=>{yaw=-.72;pitch=.68;zoom=1;draw()};$('top').onclick=()=>{yaw=0;pitch=0;zoom=1;draw()};$('play').onclick=playSim;$('pause').onclick=pauseSim;$('stop').onclick=stopSim;$('restart').onclick=resetSim;cv.onmousedown=e=>{drag=true;lx=e.clientX;ly=e.clientY;cv.style.cursor='grabbing'};addEventListener('mouseup',()=>{drag=false;cv.style.cursor='grab'});addEventListener('mousemove',e=>{if(!drag)return;yaw+=(e.clientX-lx)*.008;pitch=Math.max(-1.2,Math.min(1.2,pitch+(e.clientY-ly)*.008));lx=e.clientX;ly=e.clientY;draw()});cv.onwheel=e=>{e.preventDefault();zoom*=e.deltaY>0?.9:1.1;zoom=Math.max(.35,Math.min(4,zoom));draw()};initStock();resize();draw();})();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+  });
+}
+</script>
+
+</body></html>
