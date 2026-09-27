@@ -112,4 +112,16 @@ drawOriginMarker()}
 $('toolpathToggle').onclick=()=>{toolpathVisible=!toolpathVisible;$('toolpathToggle').textContent='TOOLPATH: '+(toolpathVisible?'ON':'OFF');$('toolpathToggle').style.background=toolpathVisible?'#355f73':'#687b84';draw();};
 const speedSteps=[.25,.5,1,2,5,10,25,50];function syncSpeedRead(){let v=+speed.value||1;$('speedread').textContent=v+'×'}$('speed').addEventListener('change',syncSpeedRead);$('speedup').onclick=()=>{let v=+speed.value||1,i=speedSteps.findIndex(n=>n>=v-.0001);i=(i+1)%speedSteps.length;speed.value=String(speedSteps[i]);syncSpeedRead();status.textContent='Playback speed: '+speedSteps[i]+'×';};syncSpeedRead();
 $('origin').addEventListener('change',()=>{state='idle';segments=[];totalTime=0;initStock();$('linebox').textContent='Ready.';clearEditorHighlight();status.textContent=originMode()==='center'?'Origin: CENTER of workpiece.':'Origin: LOWER LEFT of workpiece.';draw();});$('iso').onclick=()=>{yaw=-.72;pitch=.68;zoom=1;draw()};$('top').onclick=()=>{yaw=0;pitch=0;zoom=1;draw()};$('play').onclick=playSim;$('pause').onclick=pauseSim;$('stop').onclick=stopSim;$('restart').onclick=resetSim;cv.onmousedown=e=>{drag=true;lx=e.clientX;ly=e.clientY;cv.style.cursor='grabbing'};addEventListener('mouseup',()=>{drag=false;cv.style.cursor='grab'});addEventListener('mousemove',e=>{if(!drag)return;yaw+=(e.clientX-lx)*.008;pitch=Math.max(-1.2,Math.min(1.2,pitch+(e.clientY-ly)*.008));lx=e.clientX;ly=e.clientY;draw()});cv.onwheel=e=>{e.preventDefault();zoom*=e.deltaY>0?.9:1.1;zoom=Math.max(.35,Math.min(4,zoom));draw()};initStock();resize();draw();})();
-</script></body></html>
+</script><script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
+    const reg = await navigator.serviceWorker.register('./service-worker.js', {updateViaCache:'none'});
+    reg.update();
+    let refreshing=false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!refreshing) { refreshing=true; location.reload(); }
+    });
+  });
+}
+</script>
+</body></html>
